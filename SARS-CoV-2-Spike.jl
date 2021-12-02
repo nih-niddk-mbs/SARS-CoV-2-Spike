@@ -146,18 +146,40 @@ inserts: Vector of tuples of the ranges of insertions  e.g. (372,374)
 deletes: Vector of tuples of the ranges of deletions
 subs: Number of substitutions
 """
-function mutation(S,inserts::Vector,deletes::Vector,subs::Int)
+function mutation(S,subs::Vector,deletes::Vector,inserts::Vector)
+    mutations = assemble_mutations(subs,deletes,inserts)
+    mutation(S,mutations)
+end
+"""
+mutation(S,inserts::Vector,deletes::Vector,subs::Int)
+
+Mutate sequence S
+mutations is a list in inverse sequential order of all substitutions, deletions, and insertions
+"""
+function mutation(S,mutations)
     S1 = copy(S)
-    for s in 1:subs
-        substitution!(S1)
-    end
-    for n in inserts
-        S1 = insertion(S1,n)
-    end
-    for d in deletes
-        S1 = deletion(S1,d)
+    for m in mutations
+        S1 = m[1](S1,m[2])
     end
     return S1
+end
+
+function assemble_mutations(subs::Vector,deletes::Vector,inserts::Vector)
+    ns = length(subs)
+    nd = length(deletes)
+    ni = length(inserts)
+    f = Vector{Tuple}(undef,ns+nd+ni)
+    a = Vector{Int}(undef,ns+nd+ni)
+    for i in 1:ns
+        f[i] = (substitution,subs[i])
+    end
+    for i in 1:nd
+        f[ns+i] = (deletion,deletes[i])
+    end
+    for i in 1:ni
+        f[ns+nd+i] = (insertion,inserts[i])
+    end
+    return sort(f,by = x -> x[2][1],rev=true)
 end
 
 """
@@ -180,10 +202,17 @@ end
 
 
 """
-substitution!(S)
+substitution(S,mutation)
+substitution!(S,mutation)
 
-mutate a random amino acid
+subsitute residue mutation[2] at location mutationp[1]
 """
+function substitution(S,mutation::Tuple)
+    S1 = copy(S)
+    ind = mutation[1]
+    S1[ind] = mutation[2]
+    return S1
+end
 function substitution!(S,mutation::Tuple)
     ind = mutation[1]
     S[ind] = mutation[2]
@@ -194,22 +223,32 @@ function substitution!(S)
 end
 
 """
-insertion(S,n)
+insertion(S,mutation::Tuple)
+insertion(S,i,insert)
 
+Insert insert at location i
+
+insertion(S::Vector,n::Int)
 Insert n consecutive random amino acids
 """
-
-function insertion(S::Vector,n::Int)
+insertion(S,mutation::Tuple) = insertion(S,mutation[1],mutation[2])
+function insertion(S::Vector,i::Int,insert::Vector)
     N = length(S)
+    n = length(insert)
     S1 = Vector(undef,N+n)
-    i = rand(Vector(1:N))
     S1[1:i] = S[1:i]
     S1[i+n+1:end] = S[i+1:end]
     for j = 1:n
-        S1[i+j] = rand(aminoacids)
+        S1[i+j] = insert[j]
     end
     return S1
 end
+function insertion(S::Vector,n::Int)
+    i = rand(Vector(1:N))
+    insert = rand(aminoacids,n)
+    insertion(S,i,insert)
+end
+
 
 """
 deletion(S,n::Tuple)
